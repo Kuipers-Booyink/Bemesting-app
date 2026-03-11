@@ -51,7 +51,7 @@ with st.form("bemesting_form", clear_on_submit=True):
 
     st.write("---")
     # 7. kg/m3 velden (mogen 0 blijven)
-    st.subheader("Gehaltes (kg/m3 of kg/kg)")
+    st.subheader("Gehaltes (kg/m3 of %)")
     
     c1, c2, c3, c4 = st.columns(4)
     with c1: n_gehalte = st.number_input("N", min_value=0.0, step=0.1, value=0.0)
