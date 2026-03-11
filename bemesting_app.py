@@ -18,7 +18,7 @@ st.set_page_config(page_title="Bemestings App", page_icon="🚜", layout="center
 
 # LOGO TOEVOEGEN
 if os.path.exists("logo.png"):
-    st.image("logo.png", width=150)
+    st.image("logo.png", width=500)
 
 st.title("🚜 Bemestings Registratie")
 
