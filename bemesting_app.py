@@ -23,7 +23,7 @@ GEWASSEN = ["Grasland", "Maïs", "Consumptieaardappelen", "Suikerbieten", "Winte
 st.set_page_config(page_title="Bemestings App", page_icon="🚜", layout="centered")
 st.title("🚜 Bemestings Registratie")
 
-# --- VERWIJDER KNOP ---
+# --- VERWIJDER KNOP BOVENAAN ---
 st.link_button("🗑️ Regel Verwijderen / Aanpassen in Sheets", TABBLAD_URL, use_container_width=True)
 st.divider()
 
@@ -55,27 +55,26 @@ with st.form("bemesting_form", clear_on_submit=True):
         if not perceel:
             st.error("Vul a.u.b. een perceelnaam in.")
         else:
-            # We maken de data klaar voor Google
-            # We zetten getallen om naar tekst. Als er een 400 komt, proberen we de komma-truc.
+            stikstof_gehalte = MEST_DATA[soort_mest]
+            totaal_n = hoeveelheid * stikstof_gehalte
+
+            # Hier zijn de gekoppelde codes (inclusief je nieuwe code voor hoeveelheid)
             form_data = {
                 "entry.1132818912": str(perceel),
-                "entry.1028449416": str(grootte).replace('.', ','), # Komma voor NL Forms
+                "entry.1028449416": str(grootte).replace('.', ','), 
                 "entry.964818651": str(gewas),
                 "entry.1767061372": str(datum),
                 "entry.960136464": str(soort_mest),
-                "entry.1577906966": str(hoeveelheid).replace('.', ',')
+                "entry.1577906966": str(hoeveelheid).replace('.', ',') # Je nieuwe code verwerkt
             }
 
             try:
-                response = requests.post(FORM_URL, data=form_data)
+                response = requests.post(FORM_URL, data=form_data, timeout=10)
                 if response.status_code == 200:
-                    st.success(f"✅ Opgeslagen! ({round(hoeveelheid * MEST_DATA[soort_mest], 1)} kg N)")
+                    st.success(f"✅ Opgeslagen! ({round(totaal_n, 1)} kg N totaal)")
                     st.balloons()
                 else:
                     st.error(f"Foutcode {response.status_code}: Google weigert de data.")
-                    with st.expander("Toon technische hulp bij fout 400"):
-                        st.write("De meest voorkomende oorzaak is een verplichte vraag of 'Antwoordvalidatie' in Google Forms.")
-                        st.info("💡 **Oplossing:** Ga naar je Google Form, klik op elke vraag en zorg dat 'Antwoordvalidatie' (bij de 3 puntjes rechtsonder een vraag) UIT staat.")
             except Exception as e:
                 st.error(f"Verbindingsfout: {e}")
 
@@ -85,4 +84,4 @@ st.subheader("Overzicht Registraties")
 if not df.empty:
     st.dataframe(df, use_container_width=True)
 else:
-    st.info("Nog geen gegevens gevonden.")
+    st.info("Nog geen gegevens gevonden. Ververs de pagina na een nieuwe invoer.")
