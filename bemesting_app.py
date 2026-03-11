@@ -9,21 +9,14 @@ SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1hesKBI8Vt1Agx_R6LSOdG
 TABBLAD_URL = "https://docs.google.com/spreadsheets/d/1hesKBI8Vt1Agx_R6LSOdGabuXDaIDzf9yE2N7LGgtoo/edit?gid=1833544521#gid=1833544521"
 FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSe-8l8ZiFqf011b7pGvQe2C2fmxkqENQRjhH3MSghD6tCXDwQ/formResponse"
 
-MEST_DATA = {
-    "Runderdrijfmest": 4.1,
-    "Varkensdrijfmest": 5.2,
-    "Kunstmest (KAS)": 0.27,
-    "Digestaat": 5.0,
-    "Slurry": 3.5
-}
-
 GEWASSEN = ["Grasland", "Maïs", "Consumptieaardappelen", "Suikerbieten", "Wintertarwe"]
+MEST_SOORTEN = ["Runderdrijfmest", "Varkensdrijfmest", "Kunstmest (KAS)", "Digestaat", "Slurry", "Overig"]
 
 # --- APP LAYOUT ---
 st.set_page_config(page_title="Bemestings App", page_icon="🚜", layout="centered")
 st.title("🚜 Bemestings Registratie")
 
-# --- VERWIJDER KNOP BOVENAAN ---
+# --- VERWIJDER KNOP ---
 st.link_button("🗑️ Regel Verwijderen / Aanpassen in Sheets", TABBLAD_URL, use_container_width=True)
 st.divider()
 
@@ -34,20 +27,37 @@ try:
 except Exception:
     df = pd.DataFrame()
 
-# --- FORMULIER ---
+# --- FORMULIER IN DE GEWENSTE VOLGORDE ---
 with st.form("bemesting_form", clear_on_submit=True):
     st.subheader("Nieuwe invoer")
-    col1, col2 = st.columns(2)
     
+    # 1. Datum
+    datum = st.date_input("Datum", date.today())
+    
+    col1, col2 = st.columns(2)
     with col1:
+        # 2. Perceel
         perceel = st.text_input("Perceel")
+        # 3. Grootte
         grootte = st.number_input("Grootte (ha)", min_value=0.0, step=0.01)
-        hoeveelheid = st.number_input("Hoeveelheid (m3/kg per hectare)", min_value=0.0, step=1.0)
-        
     with col2:
+        # 4. Gewas
         gewas = st.selectbox("Gewas", GEWASSEN)
-        soort_mest = st.selectbox("Soort Mest", list(MEST_DATA.keys()))
-        datum = st.date_input("Datum", date.today())
+        # 5. Soort mest
+        soort_mest = st.selectbox("Soort Mest", MEST_SOORTEN)
+
+    # 6. Hoeveelheid
+    hoeveelheid = st.number_input("Hoeveelheid (m3/kg)", min_value=0.0, step=1.0)
+
+    st.write("---")
+    # 7. kg/m3 velden (mogen 0 blijven)
+    st.subheader("Gehaltes (kg/m3 of kg/kg)")
+    
+    c1, c2, c3, c4 = st.columns(4)
+    with c1: n_gehalte = st.number_input("N", min_value=0.0, step=0.1, value=0.0)
+    with c2: p_gehalte = st.number_input("P2O5", min_value=0.0, step=0.1, value=0.0)
+    with c3: k_gehalte = st.number_input("K2O", min_value=0.0, step=0.1, value=0.0)
+    with c4: s_gehalte = st.number_input("SO3", min_value=0.0, step=0.1, value=0.0)
 
     submit = st.form_submit_button("Opslaan naar Google Sheets")
 
@@ -55,26 +65,27 @@ with st.form("bemesting_form", clear_on_submit=True):
         if not perceel:
             st.error("Vul a.u.b. een perceelnaam in.")
         else:
-            stikstof_gehalte = MEST_DATA[soort_mest]
-            totaal_n = hoeveelheid * stikstof_gehalte
-
-            # Hier zijn de gekoppelde codes (inclusief je nieuwe code voor hoeveelheid)
+            # Data verzamelen voor Google Forms met jouw verstrekte codes
             form_data = {
+                "entry.1767061372": str(datum),
                 "entry.1132818912": str(perceel),
                 "entry.1028449416": str(grootte).replace('.', ','), 
                 "entry.964818651": str(gewas),
-                "entry.1767061372": str(datum),
                 "entry.960136464": str(soort_mest),
-                "entry.1577906966": str(hoeveelheid).replace('.', ',') # Je nieuwe code verwerkt
+                "entry.1577906966": str(hoeveelheid).replace('.', ','),
+                "entry.765229431": str(n_gehalte).replace('.', ','), 
+                "entry.239014507": str(p_gehalte).replace('.', ','),
+                "entry.950345662": str(k_gehalte).replace('.', ','),
+                "entry.825026035": str(s_gehalte).replace('.', ',')
             }
 
             try:
                 response = requests.post(FORM_URL, data=form_data, timeout=10)
                 if response.status_code == 200:
-                    st.success(f"✅ Opgeslagen! ({round(totaal_n, 1)} kg N totaal)")
+                    st.success(f"✅ Opgeslagen voor perceel {perceel}!")
                     st.balloons()
                 else:
-                    st.error(f"Foutcode {response.status_code}: Google weigert de data.")
+                    st.error(f"Foutcode {response.status_code}: Google weigert de data. Controleer of alle velden in Forms op 'Kort antwoord' staan zonder validatie.")
             except Exception as e:
                 st.error(f"Verbindingsfout: {e}")
 
@@ -82,6 +93,7 @@ with st.form("bemesting_form", clear_on_submit=True):
 st.divider()
 st.subheader("Overzicht Registraties")
 if not df.empty:
+    # We tonen de tabel. De kolomvolgorde in de app wordt bepaald door de Google Sheet.
     st.dataframe(df, use_container_width=True)
 else:
     st.info("Nog geen gegevens gevonden. Ververs de pagina na een nieuwe invoer.")
