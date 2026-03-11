@@ -10,8 +10,8 @@ SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1hesKBI8Vt1Agx_R6LSOdG
 TABBLAD_URL = "https://docs.google.com/spreadsheets/d/1hesKBI8Vt1Agx_R6LSOdGabuXDaIDzf9yE2N7LGgtoo/edit?gid=1833544521#gid=1833544521"
 FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSe-8l8ZiFqf011b7pGvQe2C2fmxkqENQRjhH3MSghD6tCXDwQ/formResponse"
 
-GEWASSEN = ["Grasland", "Maïs", "Consumptieaardappelen", "Suikerbieten", "Wintertarwe"]
-MEST_SOORTEN = ["Runderdrijfmest", "Varkensdrijfmest", "Kunstmest (KAS)", "Digestaat", "Slurry", "Overig"]
+GEWASSEN = ["Grasland", "Maïs", "Consumptieaardappelen", "Suikerbieten"]
+MEST_SOORTEN = ["Runderdrijfmest", "Varkensdrijfmest", "Kunstmest (KAS)", "Digestaat", "Overig"]
 
 # --- APP LAYOUT ---
 st.set_page_config(page_title="Bemestings App", page_icon="logo.png", layout="centered")
