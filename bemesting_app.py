@@ -42,7 +42,7 @@ with st.form("bemesting_form", clear_on_submit=True):
     with col1:
         perceel = st.text_input("Perceel")
         grootte = st.number_input("Grootte (ha)", min_value=0.0, step=0.01)
-        hoeveelheid = st.number_input("Hoeveelheid (m3/kg)", min_value=0.0, step=1.0)
+        hoeveelheid = st.number_input("Hoeveelheid (m3/kg per hectare)", min_value=0.0, step=1.0)
         
     with col2:
         gewas = st.selectbox("Gewas", GEWASSEN)
