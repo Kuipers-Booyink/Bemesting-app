@@ -14,7 +14,7 @@ GEWASSEN = ["Grasland", "Maïs", "Consumptieaardappelen", "Suikerbieten", "Winte
 MEST_SOORTEN = ["Runderdrijfmest", "Varkensdrijfmest", "Kunstmest (KAS)", "Digestaat", "Slurry", "Overig"]
 
 # --- APP LAYOUT ---
-st.set_page_config(page_title="Bemestings App", page_icon="🚜", layout="centered")
+st.set_page_config(page_title="Bemestings App", page_icon="logo.png", layout="centered")
 
 # LOGO TOEVOEGEN
 if os.path.exists("logo.png"):
