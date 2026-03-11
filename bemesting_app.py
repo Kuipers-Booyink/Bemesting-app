@@ -3,6 +3,7 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import date
 import requests
+import os
 
 # --- CONFIGURATIE ---
 SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1hesKBI8Vt1Agx_R6LSOdGabuXDaIDzf9yE2N7LGgtoo/edit#gid=0"
@@ -14,6 +15,11 @@ MEST_SOORTEN = ["Runderdrijfmest", "Varkensdrijfmest", "Kunstmest (KAS)", "Diges
 
 # --- APP LAYOUT ---
 st.set_page_config(page_title="Bemestings App", page_icon="🚜", layout="centered")
+
+# LOGO TOEVOEGEN
+if os.path.exists("logo.png"):
+    st.image("logo.png", width=150)
+
 st.title("🚜 Bemestings Registratie")
 
 # --- VERWIJDER KNOP ---
@@ -50,8 +56,8 @@ with st.form("bemesting_form", clear_on_submit=True):
     hoeveelheid = st.number_input("Hoeveelheid (m3/kg)", min_value=0.0, step=1.0)
 
     st.write("---")
-    # 7. kg/m3 velden (mogen 0 blijven)
-    st.subheader("Gehaltes (kg/m3 of %)")
+    # 7. Gehaltes (Kopjes die je wilde toevoegen)
+    st.subheader("Gehaltes (kg/m3 of kg/kg)")
     
     c1, c2, c3, c4 = st.columns(4)
     with c1: n_gehalte = st.number_input("N", min_value=0.0, step=0.1, value=0.0)
@@ -85,7 +91,7 @@ with st.form("bemesting_form", clear_on_submit=True):
                     st.success(f"✅ Opgeslagen voor perceel {perceel}!")
                     st.balloons()
                 else:
-                    st.error(f"Foutcode {response.status_code}: Google weigert de data. Controleer of alle velden in Forms op 'Kort antwoord' staan zonder validatie.")
+                    st.error(f"Foutcode {response.status_code}: Google weigert de data.")
             except Exception as e:
                 st.error(f"Verbindingsfout: {e}")
 
@@ -93,7 +99,7 @@ with st.form("bemesting_form", clear_on_submit=True):
 st.divider()
 st.subheader("Overzicht Registraties")
 if not df.empty:
-    # We tonen de tabel. De kolomvolgorde in de app wordt bepaald door de Google Sheet.
-    st.dataframe(df, use_container_width=True)
+    # We tonen de laatste 10 registraties bovenaan
+    st.dataframe(df.tail(10), use_container_width=True)
 else:
-    st.info("Nog geen gegevens gevonden. Ververs de pagina na een nieuwe invoer.")
+    st.info("Nog geen gegevens gevonden.")
