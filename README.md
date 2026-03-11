@@ -1,2 +1,0 @@
-# Bemesting-app
-Bemesting app
