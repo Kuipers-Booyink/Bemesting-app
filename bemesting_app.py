@@ -53,11 +53,11 @@ with st.form("bemesting_form", clear_on_submit=True):
         soort_mest = st.selectbox("Soort Mest", MEST_SOORTEN)
 
     # 6. Hoeveelheid
-    hoeveelheid = st.number_input("Hoeveelheid (m3/kg)", min_value=0.0, step=1.0)
+    hoeveelheid = st.number_input("Hoeveelheid (m3/kg per hectare)", min_value=0.0, step=1.0)
 
     st.write("---")
     # 7. Gehaltes (Kopjes die je wilde toevoegen)
-    st.subheader("Gehaltes (kg/m3 of kg/kg)")
+    st.subheader("Gehaltes (kg/m3 of %)")
     
     c1, c2, c3, c4 = st.columns(4)
     with c1: n_gehalte = st.number_input("N", min_value=0.0, step=0.1, value=0.0)
