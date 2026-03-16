@@ -10,7 +10,7 @@ PERCELEN_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=o
 REGISTRATIES_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Registraties"
 FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSe-8l8ZiFqf011b7pGvQe2C2fmxkqENQRjhH3MSghD6tCXDwQ/formResponse"
 
-# De entry ID's die we hebben gevonden
+# De entry ID's
 ENTRY_TOT_N = "entry.1706242385"
 ENTRY_TOT_P = "entry.68598424"
 ENTRY_TOT_K = "entry.685797379"
@@ -24,6 +24,15 @@ if os.path.exists("logo.png"):
     st.image("logo.png", width=500)
 
 st.title("Bemestingsregistratie Kuipers")
+
+# --- HULPFUNCTIE VOOR VEILIG CONVERTEREN ---
+def safe_float(val):
+    try:
+        if isinstance(val, str):
+            val = val.replace(',', '.')
+        return float(val)
+    except (ValueError, TypeError):
+        return 0.0
 
 # --- DATA OPHALEN ---
 @st.cache_data(ttl=5)
@@ -45,8 +54,10 @@ if not df_p_raw.empty and "Perceel" in df_p_raw.columns:
     ha_col = next((c for c in df_p_raw.columns if 'Hectare' in c or 'Grootte' in c), None)
     for _, row in df_p_raw.iterrows():
         p_naam = str(row["Perceel"])
-        p_ha = row[ha_col] if ha_col else 0
+        # Gebruik de veilige float functie hier
+        p_ha = safe_float(row[ha_col]) if ha_col else 0.0
         p_gewas = row["Gewas"] if "Gewas" in row else "Onbekend"
+        
         label = f"{p_naam} ({p_ha} ha)"
         perceel_opties_met_ha.append(label)
         perceel_volgorde.append(p_naam)
@@ -61,7 +72,6 @@ col1, col2 = st.columns(2)
 with col1:
     soort_mest = st.selectbox("Soort Mest", MEST_SOORTEN)
 
-# Standaardgehaltes bepalen
 if soort_mest == "Runderdrijfmest":
     def_n, def_p, def_k, def_s = 4.5, 1.9, 5.5, 0.0
 elif soort_mest == "KAS":
@@ -87,14 +97,14 @@ with st.form("bemesting_form", clear_on_submit=True):
             geslaagd = 0
             for label in geselecteerde_labels:
                 info = percelen_dict[label]
-                ha = float(info["ha"])
-                hv = float(hoeveelheid)
+                # Ook hier extra veiligheid bij het berekenen
+                ha = safe_float(info["ha"])
+                hv = safe_float(hoeveelheid)
                 
-                # Berekeningen voor de totaal-kolommen
-                t_n = round(ha * hv * float(n_g), 1)
-                t_p = round(ha * hv * float(p_g), 1)
-                t_k = round(ha * hv * float(k_g), 1)
-                t_s = round(ha * hv * float(s_g), 1)
+                t_n = round(ha * hv * safe_float(n_g), 1)
+                t_p = round(ha * hv * safe_float(p_g), 1)
+                t_k = round(ha * hv * safe_float(k_g), 1)
+                t_s = round(ha * hv * safe_float(s_g), 1)
 
                 form_data = {
                     "entry.1767061372": str(datum),
@@ -107,7 +117,6 @@ with st.form("bemesting_form", clear_on_submit=True):
                     "entry.239014507": str(p_g).replace('.', ','),
                     "entry.950345662": str(k_g).replace('.', ','),
                     "entry.825026035": str(s_g).replace('.', ','),
-                    # De berekende totalen
                     ENTRY_TOT_N: str(t_n).replace('.', ','),
                     ENTRY_TOT_P: str(t_p).replace('.', ','),
                     ENTRY_TOT_K: str(t_k).replace('.', ','),
@@ -118,7 +127,7 @@ with st.form("bemesting_form", clear_on_submit=True):
                     geslaagd += 1
             
             if geslaagd > 0:
-                st.success(f"✅ Succesvol opgeslagen en berekend voor {geslaagd} percelen!")
+                st.success(f"✅ Opgeslagen voor {geslaagd} percelen!")
                 st.cache_data.clear()
                 st.rerun()
         else:
