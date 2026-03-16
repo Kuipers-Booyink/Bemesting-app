@@ -97,4 +97,50 @@ with st.form("bemesting_form", clear_on_submit=True):
                 try:
                     response = requests.post(FORM_URL, data=form_data, timeout=10)
                     if response.status_code == 200:
-                        geslaagd
+                        geslaagd_aantal += 1
+                except Exception as e:
+                    st.error(f"Fout bij verzenden voor {p_naam}: {e}")
+
+            if geslaagd_aantal > 0:
+                st.success(f"✅ Succesvol opgeslagen voor {geslaagd_aantal} perce(e)l(en)!")
+                st.balloons()
+                st.cache_data.clear() # Forceert verversing van het overzicht
+
+# --- OVERZICHT MET FILTERS ---
+st.divider()
+st.subheader("🔍 Overzicht & Filters")
+
+if not df_registraties.empty:
+    view_df = df_registraties.copy()
+
+    # Datum sortering
+    if 'Datum' in view_df.columns:
+        view_df['Datum'] = pd.to_datetime(view_df['Datum']).dt.date
+        view_df = view_df.sort_values(by="Datum", ascending=False)
+
+    # Filter kolommen aanmaken
+    f1, f2 = st.columns(2)
+    with f1:
+        if 'Perceel' in view_df.columns:
+            perceel_filter = st.multiselect("Filter op Perceel", options=sorted(view_df['Perceel'].unique().tolist()))
+        else:
+            perceel_filter = []
+    
+    with f2:
+        # In Google Sheets heet de kolom soms 'Mest' of 'Soort Mest'
+        m_col = 'Mest' if 'Mest' in view_df.columns else 'Soort Mest'
+        if m_col in view_df.columns:
+            mest_filter = st.multiselect("Filter op Mestsoort", options=sorted(view_df[m_col].unique().tolist()))
+        else:
+            mest_filter = []
+
+    # Filters toepassen
+    if perceel_filter:
+        view_df = view_df[view_df['Perceel'].isin(perceel_filter)]
+    if mest_filter:
+        view_df = view_df[view_df[m_col].isin(mest_filter)]
+
+    # Weergave van de tabel
+    st.dataframe(view_df, use_container_width=True, hide_index=True)
+else:
+    st.info("Geen gegevens beschikbaar in tabblad 'Registraties'.")
