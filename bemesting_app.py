@@ -83,7 +83,7 @@ with st.form("bemesting_form", clear_on_submit=True):
     with col2:
         hoeveelheid = st.number_input("Hoeveelheid (m3/kg per ha)", min_value=0.0, step=1.0)
 
-    st.write("**Gehaltes (kg per m3 of kg)**")
+    st.write("**Gehaltes (kg per m3 of %)**")
     g1, g2, g3, g4 = st.columns(4)
     with g1: n_g = st.number_input("N", min_value=0.0, step=0.1, value=default_n)
     with g2: p_g = st.number_input("P2O5", min_value=0.0, step=0.1, value=default_p)
