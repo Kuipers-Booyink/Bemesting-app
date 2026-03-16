@@ -58,11 +58,13 @@ with st.expander("➕ Nieuwe Bemesting Invoeren", expanded=False):
         if st.form_submit_button("Opslaan"):
             if geselecteerde_percelen:
                 for p_naam in geselecteerde_percelen:
-                    info = percelen_dict.get(p_naam, {})
+                    info = percelen_data.get(p_naam, {})
+                    # We gebruiken hier 'Grootte (ha)' of 'Hectares'
+                    ha_waarde = info.get("Hectares") or info.get("Grootte (ha)") or 0
                     form_data = {
                         "entry.1767061372": str(datum),
                         "entry.1132818912": str(p_naam),
-                        "entry.1028449416": str(info.get("Hectares", 0)).replace('.', ','), 
+                        "entry.1028449416": str(ha_waarde).replace('.', ','), 
                         "entry.964818651": str(info.get("Gewas", "Onbekend")),
                         "entry.960136464": str(soort_mest),
                         "entry.1577906966": str(hoeveelheid).replace('.', ','),
@@ -79,44 +81,42 @@ with st.expander("➕ Nieuwe Bemesting Invoeren", expanded=False):
 # --- BEREKENINGEN VOOR OVERZICHT ---
 if not df_r_raw.empty:
     df = df_r_raw.copy()
-    # Opschonen numerieke kolommen (komma naar punt)
-    cols_to_fix = ['Hectares', 'Hoeveelheid (m3/kg per hectare)', 'N', 'P2O5', 'K2O', 'SO3']
-    for col in cols_to_fix:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
-
-    # Bereken totalen per regel
-    df['Totaal m3/kg'] = df['Hectares'] * df['Hoeveelheid (m3/kg per hectare)']
-    df['Tot_N'] = df['Totaal m3/kg'] * df['N']
-    df['Tot_P'] = df['Totaal m3/kg'] * df['P2O5']
-    df['Tot_K'] = df['Totaal m3/kg'] * df['K2O']
-    df['Tot_S'] = df['Totaal m3/kg'] * df['SO3']
-
-    # --- SECTIE 1: JAAROVERZICHT PER PERCEEL ---
-    st.header("📊 Jaaroverzicht Totalen (kg mineralen)")
-    summary = df.groupby('Perceel')[['Tot_N', 'Tot_P', 'Tot_K', 'Tot_S']].sum().reset_index()
     
-    # Sorteren volgens jouw Perceel-volgorde
-    summary['Perceel'] = pd.Categorical(summary['Perceel'], categories=perceel_volgorde, ordered=True)
-    summary = summary.sort_values('Perceel')
-    
-    # Kolomnamen netjes maken
-    summary.columns = ['Perceel', 'Totaal N', 'Totaal P2O5', 'Totaal K2O', 'Totaal SO3']
-    st.dataframe(summary.style.format(precision=0), use_container_width=True, hide_index=True)
+    # Zoek de juiste kolomnaam voor Hectares/Grootte
+    ha_col = next((c for c in df.columns if 'Hectare' in c or 'Grootte' in c), None)
+    hv_col = next((c for c in df.columns if 'Hoeveelheid' in c), None)
 
-    # --- SECTIE 2: GEDETAILLEERDE LOGBOEK ---
+    if ha_col and hv_col:
+        # Opschonen numerieke kolommen
+        for col in [ha_col, hv_col, 'N', 'P2O5', 'K2O', 'SO3']:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
+
+        # Berekeningen
+        df['Totaal m3/kg'] = df[ha_col] * df[hv_col]
+        df['Tot_N'] = df['Totaal m3/kg'] * df['N']
+        df['Tot_P'] = df['Totaal m3/kg'] * df['P2O5']
+        df['Tot_K'] = df['Totaal m3/kg'] * df['K2O']
+        df['Tot_S'] = df['Totaal m3/kg'] * df['SO3']
+
+        # --- JAAROVERZICHT ---
+        st.header("📊 Jaaroverzicht Totalen (kg mineralen)")
+        summary = df.groupby('Perceel')[['Tot_N', 'Tot_P', 'Tot_K', 'Tot_S']].sum().reset_index()
+        summary['Perceel'] = pd.Categorical(summary['Perceel'], categories=perceel_volgorde, ordered=True)
+        summary = summary.sort_values('Perceel')
+        summary.columns = ['Perceel', 'Totaal N', 'Totaal P2O5', 'Totaal K2O', 'Totaal SO3']
+        st.dataframe(summary.style.format(precision=0), use_container_width=True, hide_index=True)
+
+    else:
+        st.error(f"Kolom voor Hectares of Hoeveelheid niet gevonden. Gevonden kolommen: {df.columns.tolist()}")
+
+    # --- LOGBOEK ---
     st.divider()
     st.subheader("📋 Gedetailleerd Logboek")
-    
     if 'Datum' in df.columns:
         df['Datum'] = pd.to_datetime(df['Datum'], errors='coerce').dt.date
-    
     df['Perceel'] = pd.Categorical(df['Perceel'], categories=perceel_volgorde, ordered=True)
     df = df.sort_values(['Perceel', 'Datum'], ascending=[True, False])
-    
-    # Alleen relevante kolommen tonen in logboek
-    show_cols = ['Datum', 'Perceel', 'Soort Mest', 'Hoeveelheid (m3/kg per hectare)', 'Totaal m3/kg', 'N', 'P2O5', 'K2O', 'SO3']
-    existing_cols = [c for c in show_cols if c in df.columns]
-    st.dataframe(df[existing_cols], use_container_width=True, hide_index=True)
+    st.dataframe(df, use_container_width=True, hide_index=True)
 else:
-    st.info("Nog geen data beschikbaar voor overzicht.")
+    st.info("Nog geen data beschikbaar in tabblad 'Registraties'.")
