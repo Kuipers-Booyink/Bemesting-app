@@ -1,33 +1,35 @@
 import streamlit as st
-from streamlit_gsheets import GSheetsConnection
 import pandas as pd
-import requests
-import os
 
-# --- CONFIGURATIE ---
-SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1hesKBI8Vt1Agx_R6LSOdGabuXDaIDzf9yE2N7LGgtoo/edit"
+# De URL van je sheet
+SHEET_ID = "1hesKBI8Vt1Agx_R6LSOdGabuXDaIDzf9yE2N7LGgtoo"
+# We bouwen een directe export-link naar het tabblad 'Percelen'
+CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Percelen"
 
-st.title("Test: Percelen Laden")
+st.title("Bemestingsregistratie Kuipers")
 
-# --- VERBINDING ---
-conn = st.connection("gsheets", type=GSheetsConnection)
+def load_data():
+    try:
+        # We laden de data direct als CSV in, dit omzeilt de GSheets-connector fouten
+        df = pd.read_csv(CSV_URL)
+        return df
+    except Exception as e:
+        st.error(f"Kan geen verbinding maken: {e}")
+        return None
 
-try:
-    # We proberen nu ALLEEN dit tabblad te laden
-    df = conn.read(spreadsheet=SPREADSHEET_URL, worksheet="Percelen", ttl=0)
+df_percelen = load_data()
+
+if df_percelen is not None:
+    st.success("✅ Verbinding geslaagd via Pandas!")
     
-    if df is not None:
-        st.success("Verbinding met Google Sheets is gelukt!")
-        st.write("Gevonden percelen:")
-        st.dataframe(df)
+    # Maak de lijst met percelen voor het formulier
+    if "Perceel" in df_percelen.columns:
+        perceel_namen = df_percelen["Perceel"].tolist()
+        geselecteerd = st.selectbox("Kies een perceel", options=perceel_namen)
         
-        # Maak de lijst voor het formulier
-        if "Perceel" in df.columns:
-            perceel_namen = df["Perceel"].tolist()
-            st.selectbox("Selecteer een perceel om te testen", options=perceel_namen)
-        else:
-            st.error("Kolom 'Perceel' niet gevonden. Check de spelling in je sheet.")
-            
-except Exception as e:
-    st.error(f"Foutmelding van Google: {e}")
-    st.info("Oplossing: Klik in Google Sheets op 'Delen' -> 'Iedereen met de link' -> 'Lezer'.")
+        # Toon de rest van de tabel ter controle
+        st.write("Data uit de sheet:")
+        st.dataframe(df_percelen)
+    else:
+        st.error("Kolom 'Perceel' niet gevonden in de sheet.")
+        st.write("Beschikbare kolommen:", df_percelen.columns.tolist())
