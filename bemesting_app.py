@@ -6,10 +6,8 @@ import os
 
 # --- CONFIGURATIE ---
 SHEET_ID = "1hesKBI8Vt1Agx_R6LSOdGabuXDaIDzf9yE2N7LGgtoo"
-# Directe CSV-links naar de tabbladen
 PERCELEN_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Percelen"
 REGISTRATIES_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Registraties"
-# Google Form voor verzenden
 FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSe-8l8ZiFqf011b7pGvQe2C2fmxkqENQRjhH3MSghD6tCXDwQ/formResponse"
 
 MEST_SOORTEN = ["Runderdrijfmest", "KAS", "Blending", "K-60"]
@@ -23,7 +21,7 @@ if os.path.exists("logo.png"):
 st.title("Bemestingsregistratie Kuipers")
 
 # --- DATA OPHALEN ---
-@st.cache_data(ttl=10) # Ververst elke 10 seconden
+@st.cache_data(ttl=10)
 def load_percelen():
     try:
         df = pd.read_csv(PERCELEN_URL)
@@ -77,12 +75,52 @@ with st.form("bemesting_form", clear_on_submit=True):
             geslaagd_aantal = 0
             for p_naam in geselecteerde_percelen:
                 info = percelen_data.get(p_naam, {})
-                # Check of kolom 'Hectares' heet in je sheet
                 p_ha = info.get("Hectares", 0) 
                 p_gewas = info.get("Gewas", "Onbekend")
                 
+                # De data verzamelen voor Google Forms
                 form_data = {
                     "entry.1767061372": str(datum),
                     "entry.1132818912": str(p_naam),
                     "entry.1028449416": str(p_ha).replace('.', ','), 
-                    "entry.96481865
+                    "entry.964818651": str(p_gewas),
+                    "entry.960136464": str(soort_mest),
+                    "entry.1577906966": str(hoeveelheid).replace('.', ','),
+                    "entry.765229431": str(n_gehalte).replace('.', ','), 
+                    "entry.239014507": str(p_gehalte).replace('.', ','),
+                    "entry.950345662": str(k_gehalte).replace('.', ','),
+                    "entry.825026035": str(s_gehalte).replace('.', ',')
+                }
+
+                try:
+                    r = requests.post(FORM_URL, data=form_data, timeout=10)
+                    if r.status_code == 200:
+                        geslaagd_aantal += 1
+                except:
+                    pass
+
+            if geslaagd_aantal > 0:
+                st.success(f"✅ Opgeslagen voor {geslaagd_aantal} perce(e)l(en)!")
+                st.balloons()
+                st.cache_data.clear()
+
+# --- OVERZICHT ---
+st.divider()
+st.subheader("🔍 Overzicht & Filters")
+
+if not df_registraties.empty:
+    view_df = df_registraties.copy()
+    
+    if 'Datum' in view_df.columns:
+        view_df['Datum'] = pd.to_datetime(view_df['Datum'], errors='coerce').dt.date
+        view_df = view_df.sort_values(by='Datum', ascending=False)
+
+    if 'Perceel' in view_df.columns:
+        p_opties = sorted(view_df['Perceel'].unique().tolist())
+        p_filter = st.multiselect("Filter op Perceel", options=p_opties)
+        if p_filter:
+            view_df = view_df[view_df['Perceel'].isin(p_filter)]
+
+    st.dataframe(view_df, use_container_width=True, hide_index=True)
+else:
+    st.info("Geen eerdere registraties gevonden.")
