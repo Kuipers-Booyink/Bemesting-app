@@ -21,12 +21,12 @@ if os.path.exists("logo.png"):
 st.title("Bemestingsregistratie Kuipers")
 
 # --- DATA OPHALEN ---
-@st.cache_data(ttl=10)
+@st.cache_data(ttl=5) # Kortere cache voor snellere updates
 def load_percelen_data():
     try:
         df = pd.read_csv(PERCELEN_URL)
         if "Perceel" in df.columns:
-            # We halen de volgorde uit kolom A van de sheet Percelen
+            # We pakken de volgorde van kolom A
             perceel_volgorde = df["Perceel"].dropna().unique().tolist()
             percelen_dict = df.set_index("Perceel").to_dict('index')
             return percelen_dict, perceel_volgorde
@@ -34,7 +34,7 @@ def load_percelen_data():
     except:
         return {}, []
 
-@st.cache_data(ttl=10)
+@st.cache_data(ttl=5)
 def load_registraties():
     try:
         return pd.read_csv(REGISTRATIES_URL)
@@ -47,15 +47,8 @@ df_registraties = load_registraties()
 # --- FORMULIER ---
 with st.form("bemesting_form", clear_on_submit=True):
     st.subheader("Nieuwe invoer")
-    
     datum = st.date_input("Datum", date.today())
-    
-    # Gebruik de volgorde uit de sheet voor de selectielijst
-    geselecteerde_percelen = st.multiselect(
-        "Selecteer Perce(e)l(en)", 
-        options=perceel_volgorde,
-        help="De volgorde uit de sheet 'Percelen' wordt aangehouden."
-    )
+    geselecteerde_percelen = st.multiselect("Selecteer Perce(e)l(en)", options=perceel_volgorde)
     
     col1, col2 = st.columns(2)
     with col1:
@@ -94,42 +87,36 @@ with st.form("bemesting_form", clear_on_submit=True):
                     "entry.950345662": str(k_gehalte).replace('.', ','),
                     "entry.825026035": str(s_gehalte).replace('.', ',')
                 }
-
                 try:
                     r = requests.post(FORM_URL, data=form_data, timeout=10)
-                    if r.status_code == 200:
-                        geslaagd_aantal += 1
-                except:
-                    pass
+                    if r.status_code == 200: geslaagd_aantal += 1
+                except: pass
 
             if geslaagd_aantal > 0:
-                st.success(f"✅ Opgeslagen voor {geslaagd_aantal} perce(e)l(en)!")
+                st.success(f"✅ Opgeslagen!")
                 st.cache_data.clear()
 
 # --- OVERZICHT ---
 st.divider()
-st.subheader("🔍 Overzicht")
+st.subheader("🔍 Overzicht per Perceel")
 
 if not df_registraties.empty:
     view_df = df_registraties.copy()
     
-    # 1. Datum converteren
     if 'Datum' in view_df.columns:
         view_df['Datum'] = pd.to_datetime(view_df['Datum'], errors='coerce').dt.date
 
-    # 2. SORTEREN op basis van de volgorde in de Percelen-lijst (Kolom A)
+    # SORTEREN: Forceer de volgorde van de Percelen-lijst
     if 'Perceel' in view_df.columns and perceel_volgorde:
-        # We dwingen de kolom 'Perceel' om de volgorde van perceel_volgorde aan te nemen
-        view_df['Perceel'] = pd.Categorical(
-            view_df['Perceel'], 
-            categories=perceel_volgorde, 
-            ordered=True
-        )
+        # 1. Verwijder rijen met percelen die niet in onze lijst staan (optioneel)
+        view_df = view_df[view_df['Perceel'].isin(perceel_volgorde)]
         
-        # Sorteer eerst op Perceel (volgens lijst) en dan op Datum (nieuwste boven)
+        # 2. Zet de volgorde vast
+        view_df['Perceel'] = pd.Categorical(view_df['Perceel'], categories=perceel_volgorde, ordered=True)
+        
+        # 3. Sorteer op Perceel-volgorde, en binnen elk perceel op Datum (nieuwste boven)
         view_df = view_df.sort_values(by=['Perceel', 'Datum'], ascending=[True, False])
 
-    # De tabel tonen
     st.dataframe(view_df, use_container_width=True, hide_index=True)
 else:
-    st.info("Geen eerdere registraties gevonden.")
+    st.info("Geen gegevens gevonden.")
