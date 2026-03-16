@@ -12,7 +12,6 @@ FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSe-8l8ZiFqf011b7pGvQe2C2fmx
 
 MEST_SOORTEN = ["Runderdrijfmest", "KAS", "Blending", "K-60"]
 
-# --- APP LAYOUT ---
 st.set_page_config(page_title="Bemestings App", page_icon="logo.png", layout="centered")
 
 if os.path.exists("logo.png"):
@@ -21,102 +20,107 @@ if os.path.exists("logo.png"):
 st.title("Bemestingsregistratie Kuipers")
 
 # --- DATA OPHALEN ---
-@st.cache_data(ttl=5) # Kortere cache voor snellere updates
-def load_percelen_data():
-    try:
-        df = pd.read_csv(PERCELEN_URL)
-        if "Perceel" in df.columns:
-            # We pakken de volgorde van kolom A
-            perceel_volgorde = df["Perceel"].dropna().unique().tolist()
-            percelen_dict = df.set_index("Perceel").to_dict('index')
-            return percelen_dict, perceel_volgorde
-        return {}, []
-    except:
-        return {}, []
-
 @st.cache_data(ttl=5)
-def load_registraties():
+def load_data():
     try:
-        return pd.read_csv(REGISTRATIES_URL)
+        df_p = pd.read_csv(PERCELEN_URL)
+        df_r = pd.read_csv(REGISTRATIES_URL)
+        return df_p, df_r
     except:
-        return pd.DataFrame()
+        return pd.DataFrame(), pd.DataFrame()
 
-percelen_data, perceel_volgorde = load_percelen_data()
-df_registraties = load_registraties()
+df_p_raw, df_r_raw = load_data()
+
+# Percelen verwerken voor de dropdown
+perceel_opties_met_ha = []
+percelen_dict = {}
+perceel_volgorde = []
+
+if not df_p_raw.empty and "Perceel" in df_p_raw.columns:
+    # Bepaal welke kolom de hectares bevat
+    ha_col = next((c for c in df_p_raw.columns if 'Hectare' in c or 'Grootte' in c), None)
+    
+    for _, row in df_p_raw.iterrows():
+        p_naam = str(row["Perceel"])
+        p_ha = row[ha_col] if ha_col else 0
+        p_gewas = row["Gewas"] if "Gewas" in row else "Onbekend"
+        
+        # Maak de label voor de dropdown: "Naam (0.00 ha)"
+        label = f"{p_naam} ({p_ha} ha)"
+        
+        perceel_opties_met_ha.append(label)
+        perceel_volgorde.append(p_naam)
+        percelen_dict[label] = {
+            "naam": p_naam,
+            "ha": p_ha,
+            "gewas": p_gewas
+        }
 
 # --- FORMULIER ---
 with st.form("bemesting_form", clear_on_submit=True):
     st.subheader("Nieuwe invoer")
     datum = st.date_input("Datum", date.today())
-    geselecteerde_percelen = st.multiselect("Selecteer Perce(e)l(en)", options=perceel_volgorde)
+    
+    # Gebruik de nieuwe labels met hectares erin
+    geselecteerde_labels = st.multiselect(
+        "Selecteer Perce(e)l(en)", 
+        options=perceel_opties_met_ha
+    )
     
     col1, col2 = st.columns(2)
     with col1:
         soort_mest = st.selectbox("Soort Mest", MEST_SOORTEN)
     with col2:
-        hoeveelheid = st.number_input("Hoeveelheid (m3/kg per hectare)", min_value=0.0, step=1.0)
+        hoeveelheid = st.number_input("Hoeveelheid (m3/kg per ha)", min_value=0.0, step=1.0)
 
-    st.subheader("Gehaltes (kg/m3 of %)")
-    c1, c2, c3, c4 = st.columns(4)
-    with c1: n_gehalte = st.number_input("N", min_value=0.0, step=0.1)
-    with c2: p_gehalte = st.number_input("P2O5", min_value=0.0, step=0.1)
-    with c3: k_gehalte = st.number_input("K2O", min_value=0.0, step=0.1)
-    with c4: s_gehalte = st.number_input("SO3", min_value=0.0, step=0.1)
+    st.write("**Gehaltes (kg per m3 of kg)**")
+    g1, g2, g3, g4 = st.columns(4)
+    with g1: n_g = st.number_input("N", min_value=0.0, step=0.1)
+    with g2: p_g = st.number_input("P2O5", min_value=0.0, step=0.1)
+    with g3: k_g = st.number_input("K2O", min_value=0.0, step=0.1)
+    with g4: s_g = st.number_input("SO3", min_value=0.0, step=0.1)
 
-    submit = st.form_submit_button("Opslaan naar Google Sheets")
-
-    if submit:
-        if not geselecteerde_percelen:
-            st.error("Selecteer a.u.b. minimaal één perceel.")
-        else:
-            geslaagd_aantal = 0
-            for p_naam in geselecteerde_percelen:
-                info = percelen_data.get(p_naam, {})
-                p_ha = info.get("Hectares", 0) 
-                p_gewas = info.get("Gewas", "Onbekend")
-                
+    if st.form_submit_button("Opslaan naar Google Sheets"):
+        if geselecteerde_labels:
+            geslaagd = 0
+            for label in geselecteerde_labels:
+                info = percelen_dict[label]
                 form_data = {
                     "entry.1767061372": str(datum),
-                    "entry.1132818912": str(p_naam),
-                    "entry.1028449416": str(p_ha).replace('.', ','), 
-                    "entry.964818651": str(p_gewas),
+                    "entry.1132818912": str(info["naam"]),
+                    "entry.1028449416": str(info["ha"]).replace('.', ','), 
+                    "entry.964818651": str(info["gewas"]),
                     "entry.960136464": str(soort_mest),
                     "entry.1577906966": str(hoeveelheid).replace('.', ','),
-                    "entry.765229431": str(n_gehalte).replace('.', ','), 
-                    "entry.239014507": str(p_gehalte).replace('.', ','),
-                    "entry.950345662": str(k_gehalte).replace('.', ','),
-                    "entry.825026035": str(s_gehalte).replace('.', ',')
+                    "entry.765229431": str(n_g).replace('.', ','), 
+                    "entry.239014507": str(p_g).replace('.', ','),
+                    "entry.950345662": str(k_g).replace('.', ','),
+                    "entry.825026035": str(s_g).replace('.', ',')
                 }
-                try:
-                    r = requests.post(FORM_URL, data=form_data, timeout=10)
-                    if r.status_code == 200: geslaagd_aantal += 1
-                except: pass
-
-            if geslaagd_aantal > 0:
-                st.success(f"✅ Opgeslagen!")
+                r = requests.post(FORM_URL, data=form_data)
+                if r.status_code == 200:
+                    geslaagd += 1
+            
+            if geslaagd > 0:
+                st.success(f"✅ Opgeslagen voor {geslaagd} perceel/percelen!")
                 st.cache_data.clear()
+        else:
+            st.error("Selecteer a.u.b. minimaal één perceel.")
 
-# --- OVERZICHT ---
+# --- LOGBOEK (ZONDER JAAROVERZICHT) ---
 st.divider()
-st.subheader("🔍 Overzicht per Perceel")
+st.subheader("📋 Logboek")
 
-if not df_registraties.empty:
-    view_df = df_registraties.copy()
-    
+if not df_r_raw.empty:
+    view_df = df_r_raw.copy()
     if 'Datum' in view_df.columns:
         view_df['Datum'] = pd.to_datetime(view_df['Datum'], errors='coerce').dt.date
-
-    # SORTEREN: Forceer de volgorde van de Percelen-lijst
+    
+    # Sorteren op de volgorde van de Percelen-lijst
     if 'Perceel' in view_df.columns and perceel_volgorde:
-        # 1. Verwijder rijen met percelen die niet in onze lijst staan (optioneel)
-        view_df = view_df[view_df['Perceel'].isin(perceel_volgorde)]
-        
-        # 2. Zet de volgorde vast
         view_df['Perceel'] = pd.Categorical(view_df['Perceel'], categories=perceel_volgorde, ordered=True)
-        
-        # 3. Sorteer op Perceel-volgorde, en binnen elk perceel op Datum (nieuwste boven)
-        view_df = view_df.sort_values(by=['Perceel', 'Datum'], ascending=[True, False])
-
+        view_df = view_df.sort_values(['Perceel', 'Datum'], ascending=[True, False])
+    
     st.dataframe(view_df, use_container_width=True, hide_index=True)
 else:
-    st.info("Geen gegevens gevonden.")
+    st.info("Nog geen registraties gevonden.")
