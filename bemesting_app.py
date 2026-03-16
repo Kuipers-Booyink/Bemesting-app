@@ -10,11 +10,11 @@ PERCELEN_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=o
 REGISTRATIES_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Registraties"
 FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSe-8l8ZiFqf011b7pGvQe2C2fmxkqENQRjhH3MSghD6tCXDwQ/formResponse"
 
-# De entry ID's voor de totaal-kolommen
-ENTRY_TOT_N = "entry.1706242385"
-ENTRY_TOT_P = "entry.68598424"
-ENTRY_TOT_K = "entry.685797379"
-ENTRY_TOT_S = "entry.1691238474"
+# De zojuist gevonden Entry ID's voor de totalen
+ENTRY_TOT_N = "entry.386036128"
+ENTRY_TOT_P = "entry.2075769698"
+ENTRY_TOT_K = "entry.1194216996"
+ENTRY_TOT_S = "entry.2093212887"
 
 MEST_SOORTEN = ["Runderdrijfmest", "KAS", "Blending", "K-60"]
 
@@ -67,7 +67,7 @@ col1, col2 = st.columns(2)
 with col1:
     soort_mest = st.selectbox("Soort Mest", MEST_SOORTEN)
 
-# --- AANGEPASTE STANDAARDGEHALTES ---
+# --- STANDAARDWAARDEN ---
 if soort_mest == "Runderdrijfmest":
     def_n, def_p, def_k, def_s = 4.5, 1.9, 5.5, 0.0
 elif soort_mest == "KAS":
@@ -81,7 +81,7 @@ with st.form("bemesting_form", clear_on_submit=True):
     with col2:
         hoeveelheid = st.number_input("Hoeveelheid (m3/kg per ha)", min_value=0.0, step=1.0)
 
-    st.write("**Gehaltes (kg per m3 of kg)**")
+    st.write("**Gehaltes (per m3 of kg)**")
     g1, g2, g3, g4 = st.columns(4)
     with g1: n_g = st.number_input("N", value=def_n, format="%.2f", step=0.01)
     with g2: p_g = st.number_input("P2O5", value=def_p, format="%.2f", step=0.01)
@@ -95,7 +95,7 @@ with st.form("bemesting_form", clear_on_submit=True):
                 ha = safe_float(info["ha"])
                 hv = safe_float(hoeveelheid)
                 
-                # Berekeningen met de nieuwe decimalen
+                # De berekening: Hectare * Hoeveelheid * Gehalte
                 t_n = round(ha * hv * safe_float(n_g), 2)
                 t_p = round(ha * hv * safe_float(p_g), 2)
                 t_k = round(ha * hv * safe_float(k_g), 2)
@@ -112,15 +112,15 @@ with st.form("bemesting_form", clear_on_submit=True):
                     "entry.239014507": str(p_g).replace('.', ','),
                     "entry.950345662": str(k_g).replace('.', ','),
                     "entry.825026035": str(s_g).replace('.', ','),
+                    # De nieuwe berekende totalen
                     ENTRY_TOT_N: str(t_n).replace('.', ','),
                     ENTRY_TOT_P: str(t_p).replace('.', ','),
                     ENTRY_TOT_K: str(t_k).replace('.', ','),
                     ENTRY_TOT_S: str(t_s).replace('.', ',')
                 }
-                
                 requests.post(FORM_URL, data=form_data)
             
-            st.success("✅ Opgeslagen en berekend!")
+            st.success("✅ Opgeslagen! De totalen zijn berekend en verzonden.")
             st.cache_data.clear()
             st.rerun()
         else:
@@ -135,4 +135,5 @@ if not df_r_raw.empty:
         view_df['Datum'] = pd.to_datetime(view_df['Datum'], errors='coerce').dt.date
     if 'Perceel' in view_df.columns and perceel_volgorde:
         view_df['Perceel'] = pd.Categorical(view_df['Perceel'], categories=perceel_volgorde, ordered=True)
-        view
+        view_df = view_df.sort_values(['Perceel', 'Datum'], ascending=[True, False])
+    st.dataframe(view_df, use_container_width=True, hide_index=True)
