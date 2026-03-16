@@ -26,6 +26,8 @@ def load_percelen():
     try:
         df = pd.read_csv(PERCELEN_URL)
         if "Perceel" in df.columns:
+            # Sorteren op naam voor het dropdown-menu
+            df = df.sort_values(by="Perceel")
             return df.set_index("Perceel").to_dict('index')
         return {}
     except:
@@ -34,7 +36,8 @@ def load_percelen():
 @st.cache_data(ttl=10)
 def load_registraties():
     try:
-        return pd.read_csv(REGISTRATIES_URL)
+        df = pd.read_csv(REGISTRATIES_URL)
+        return df
     except:
         return pd.DataFrame()
 
@@ -47,9 +50,12 @@ with st.form("bemesting_form", clear_on_submit=True):
     
     datum = st.date_input("Datum", date.today())
     
+    # Opties staan nu op alfabetische volgorde
+    perceel_opties = sorted(list(percelen_data.keys()))
+    
     geselecteerde_percelen = st.multiselect(
         "Selecteer Perce(e)l(en)", 
-        options=list(percelen_data.keys()),
+        options=perceel_opties,
         help="Hectares en gewas worden automatisch opgehaald."
     )
     
@@ -78,7 +84,6 @@ with st.form("bemesting_form", clear_on_submit=True):
                 p_ha = info.get("Hectares", 0) 
                 p_gewas = info.get("Gewas", "Onbekend")
                 
-                # De data verzamelen voor Google Forms
                 form_data = {
                     "entry.1767061372": str(datum),
                     "entry.1132818912": str(p_naam),
@@ -101,20 +106,35 @@ with st.form("bemesting_form", clear_on_submit=True):
 
             if geslaagd_aantal > 0:
                 st.success(f"✅ Opgeslagen voor {geslaagd_aantal} perce(e)l(en)!")
-                st.balloons()
                 st.cache_data.clear()
 
 # --- OVERZICHT ---
 st.divider()
-st.subheader("🔍 Overzicht & Filters")
+st.subheader("🔍 Overzicht (Gesoorteerd op Perceel)")
 
 if not df_registraties.empty:
     view_df = df_registraties.copy()
     
+    # Datum omzetten voor sortering
     if 'Datum' in view_df.columns:
         view_df['Datum'] = pd.to_datetime(view_df['Datum'], errors='coerce').dt.date
-        view_df = view_df.sort_values(by='Datum', ascending=False)
 
+    # SORTEREN: Eerst op Perceel (A-Z), dan op Datum (Nieuwste eerst)
+    sort_cols = []
+    sort_orders = []
+    
+    if 'Perceel' in view_df.columns:
+        sort_cols.append('Perceel')
+        sort_orders.append(True) # True = A-Z
+    
+    if 'Datum' in view_df.columns:
+        sort_cols.append('Datum')
+        sort_orders.append(False) # False = Nieuwste boven
+
+    if sort_cols:
+        view_df = view_df.sort_values(by=sort_cols, ascending=sort_orders)
+
+    # Filter optie blijft bestaan
     if 'Perceel' in view_df.columns:
         p_opties = sorted(view_df['Perceel'].unique().tolist())
         p_filter = st.multiselect("Filter op Perceel", options=p_opties)
