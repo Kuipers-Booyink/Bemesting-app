@@ -54,36 +54,30 @@ if not df_p_raw.empty and "Perceel" in df_p_raw.columns:
         }
 
 # --- FORMULIER ---
-# We halen de soort_mest selectie uit het formulier-blok om de rest van de pagina te kunnen updaten
 st.subheader("Nieuwe invoer")
 
-# Datum en Perceel selectie
 datum = st.date_input("Datum", date.today())
 geselecteerde_labels = st.multiselect("Selecteer Perce(e)l(en)", options=perceel_opties_met_ha)
 
 col1, col2 = st.columns(2)
 with col1:
-    # Hier kiezen we de mestsoort
     soort_mest = st.selectbox("Soort Mest", MEST_SOORTEN)
 
-# Logica voor automatische waardes
-if soort_mest == "KAS":
-    default_n = 0.27
-    default_p = 0.0
-    default_k = 0.0
-    default_s = 0.0
-else:
-    default_n = 0.0
-    default_p = 0.0
-    default_k = 0.0
-    default_s = 0.0
+# --- LOGICA VOOR STANDAARDWAARDEN ---
+if soort_mest == "Runderdrijfmest":
+    default_n, default_p, default_k, default_s = 4.5, 1.9, 5.5, 0.0
+elif soort_mest == "KAS":
+    default_n, default_p, default_k, default_s = 27.0, 0.0, 0.0, 0.0
+elif soort_mest == "K-60":
+    default_n, default_p, default_k, default_s = 0.0, 0.0, 60.0, 0.0
+else: # Blending of andere
+    default_n, default_p, default_k, default_s = 0.0, 0.0, 0.0, 0.0
 
-# Nu het werkelijke formulier voor de rest van de data
 with st.form("bemesting_form", clear_on_submit=True):
     with col2:
         hoeveelheid = st.number_input("Hoeveelheid (m3/kg per ha)", min_value=0.0, step=1.0)
 
-    st.write("**Gehaltes (kg per m3 of %)**")
+    st.write("**Gehaltes (kg per m3 of kg)**")
     g1, g2, g3, g4 = st.columns(4)
     with g1: n_g = st.number_input("N", min_value=0.0, step=0.1, value=default_n)
     with g2: p_g = st.number_input("P2O5", min_value=0.0, step=0.1, value=default_p)
@@ -114,7 +108,7 @@ with st.form("bemesting_form", clear_on_submit=True):
             if geslaagd > 0:
                 st.success(f"✅ Opgeslagen voor {geslaagd} perceel/percelen!")
                 st.cache_data.clear()
-                st.rerun() # Pagina verversen om formulier leeg te maken
+                st.rerun()
         else:
             st.error("Selecteer a.u.b. minimaal één perceel.")
 
