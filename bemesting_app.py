@@ -10,7 +10,7 @@ PERCELEN_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=o
 REGISTRATIES_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Registraties"
 FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSe-8l8ZiFqf011b7pGvQe2C2fmxkqENQRjhH3MSghD6tCXDwQ/formResponse"
 
-# De entry ID's
+# De entry ID's voor de totaal-kolommen
 ENTRY_TOT_N = "entry.1706242385"
 ENTRY_TOT_P = "entry.68598424"
 ENTRY_TOT_K = "entry.685797379"
@@ -25,16 +25,14 @@ if os.path.exists("logo.png"):
 
 st.title("Bemestingsregistratie Kuipers")
 
-# --- HULPFUNCTIE VOOR VEILIG CONVERTEREN ---
 def safe_float(val):
     try:
         if isinstance(val, str):
             val = val.replace(',', '.')
         return float(val)
-    except (ValueError, TypeError):
+    except:
         return 0.0
 
-# --- DATA OPHALEN ---
 @st.cache_data(ttl=5)
 def load_data():
     try:
@@ -45,7 +43,6 @@ def load_data():
         return pd.DataFrame(), pd.DataFrame()
 
 df_p_raw, df_r_raw = load_data()
-
 perceel_opties_met_ha = []
 percelen_dict = {}
 perceel_volgorde = []
@@ -54,10 +51,8 @@ if not df_p_raw.empty and "Perceel" in df_p_raw.columns:
     ha_col = next((c for c in df_p_raw.columns if 'Hectare' in c or 'Grootte' in c), None)
     for _, row in df_p_raw.iterrows():
         p_naam = str(row["Perceel"])
-        # Gebruik de veilige float functie hier
         p_ha = safe_float(row[ha_col]) if ha_col else 0.0
         p_gewas = row["Gewas"] if "Gewas" in row else "Onbekend"
-        
         label = f"{p_naam} ({p_ha} ha)"
         perceel_opties_met_ha.append(label)
         perceel_volgorde.append(p_naam)
@@ -72,6 +67,7 @@ col1, col2 = st.columns(2)
 with col1:
     soort_mest = st.selectbox("Soort Mest", MEST_SOORTEN)
 
+# --- AANGEPASTE STANDAARDGEHALTES ---
 if soort_mest == "Runderdrijfmest":
     def_n, def_p, def_k, def_s = 4.5, 1.9, 5.5, 0.0
 elif soort_mest == "KAS":
@@ -87,24 +83,23 @@ with st.form("bemesting_form", clear_on_submit=True):
 
     st.write("**Gehaltes (kg per m3 of kg)**")
     g1, g2, g3, g4 = st.columns(4)
-    with g1: n_g = st.number_input("N", value=def_n, step=0.1)
-    with g2: p_g = st.number_input("P2O5", value=def_p, step=0.1)
-    with g3: k_g = st.number_input("K2O", value=def_k, step=0.1)
-    with g4: s_g = st.number_input("SO3", value=def_s, step=0.1)
+    with g1: n_g = st.number_input("N", value=def_n, format="%.2f", step=0.01)
+    with g2: p_g = st.number_input("P2O5", value=def_p, format="%.2f", step=0.01)
+    with g3: k_g = st.number_input("K2O", value=def_k, format="%.2f", step=0.01)
+    with g4: s_g = st.number_input("SO3", value=def_s, format="%.2f", step=0.01)
 
     if st.form_submit_button("Opslaan naar Google Sheets"):
         if geselecteerde_labels:
-            geslaagd = 0
             for label in geselecteerde_labels:
                 info = percelen_dict[label]
-                # Ook hier extra veiligheid bij het berekenen
                 ha = safe_float(info["ha"])
                 hv = safe_float(hoeveelheid)
                 
-                t_n = round(ha * hv * safe_float(n_g), 1)
-                t_p = round(ha * hv * safe_float(p_g), 1)
-                t_k = round(ha * hv * safe_float(k_g), 1)
-                t_s = round(ha * hv * safe_float(s_g), 1)
+                # Berekeningen met de nieuwe decimalen
+                t_n = round(ha * hv * safe_float(n_g), 2)
+                t_p = round(ha * hv * safe_float(p_g), 2)
+                t_k = round(ha * hv * safe_float(k_g), 2)
+                t_s = round(ha * hv * safe_float(s_g), 2)
 
                 form_data = {
                     "entry.1767061372": str(datum),
@@ -122,14 +117,12 @@ with st.form("bemesting_form", clear_on_submit=True):
                     ENTRY_TOT_K: str(t_k).replace('.', ','),
                     ENTRY_TOT_S: str(t_s).replace('.', ',')
                 }
-                r = requests.post(FORM_URL, data=form_data)
-                if r.status_code == 200:
-                    geslaagd += 1
+                
+                requests.post(FORM_URL, data=form_data)
             
-            if geslaagd > 0:
-                st.success(f"✅ Opgeslagen voor {geslaagd} percelen!")
-                st.cache_data.clear()
-                st.rerun()
+            st.success("✅ Opgeslagen en berekend!")
+            st.cache_data.clear()
+            st.rerun()
         else:
             st.error("Selecteer a.u.b. minimaal één perceel.")
 
@@ -142,5 +135,4 @@ if not df_r_raw.empty:
         view_df['Datum'] = pd.to_datetime(view_df['Datum'], errors='coerce').dt.date
     if 'Perceel' in view_df.columns and perceel_volgorde:
         view_df['Perceel'] = pd.Categorical(view_df['Perceel'], categories=perceel_volgorde, ordered=True)
-        view_df = view_df.sort_values(['Perceel', 'Datum'], ascending=[True, False])
-    st.dataframe(view_df, use_container_width=True, hide_index=True)
+        view
