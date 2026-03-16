@@ -10,7 +10,7 @@ PERCELEN_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=o
 REGISTRATIES_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Registraties"
 FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSe-8l8ZiFqf011b7pGvQe2C2fmxkqENQRjhH3MSghD6tCXDwQ/formResponse"
 
-# De zojuist gevonden Entry ID's voor de totalen
+# De Entry ID's voor de totalen (nu per hectare)
 ENTRY_TOT_N = "entry.386036128"
 ENTRY_TOT_P = "entry.2075769698"
 ENTRY_TOT_K = "entry.1194216996"
@@ -95,11 +95,12 @@ with st.form("bemesting_form", clear_on_submit=True):
                 ha = safe_float(info["ha"])
                 hv = safe_float(hoeveelheid)
                 
-                # De berekening: Hectare * Hoeveelheid * Gehalte
-                t_n = round(ha * hv * safe_float(n_g), 2)
-                t_p = round(ha * hv * safe_float(p_g), 2)
-                t_k = round(ha * hv * safe_float(k_g), 2)
-                t_s = round(ha * hv * safe_float(s_g), 2)
+                # BEREKENING PER HECTARE: Hoeveelheid * Gehalte
+                # Voorbeeld: 200kg KAS * 0,27 N = 54kg N/ha
+                t_n_ha = round(hv * safe_float(n_g), 2)
+                t_p_ha = round(hv * safe_float(p_g), 2)
+                t_k_ha = round(hv * safe_float(k_g), 2)
+                t_s_ha = round(hv * safe_float(s_g), 2)
 
                 form_data = {
                     "entry.1767061372": str(datum),
@@ -112,15 +113,15 @@ with st.form("bemesting_form", clear_on_submit=True):
                     "entry.239014507": str(p_g).replace('.', ','),
                     "entry.950345662": str(k_g).replace('.', ','),
                     "entry.825026035": str(s_g).replace('.', ','),
-                    # De nieuwe berekende totalen
-                    ENTRY_TOT_N: str(t_n).replace('.', ','),
-                    ENTRY_TOT_P: str(t_p).replace('.', ','),
-                    ENTRY_TOT_K: str(t_k).replace('.', ','),
-                    ENTRY_TOT_S: str(t_s).replace('.', ',')
+                    # De totalen per hectare
+                    ENTRY_TOT_N: str(t_n_ha).replace('.', ','),
+                    ENTRY_TOT_P: str(t_p_ha).replace('.', ','),
+                    ENTRY_TOT_K: str(t_k_ha).replace('.', ','),
+                    ENTRY_TOT_S: str(t_s_ha).replace('.', ',')
                 }
                 requests.post(FORM_URL, data=form_data)
             
-            st.success("✅ Opgeslagen! De totalen zijn berekend en verzonden.")
+            st.success("✅ Opgeslagen! Totalen per hectare zijn berekend.")
             st.cache_data.clear()
             st.rerun()
         else:
