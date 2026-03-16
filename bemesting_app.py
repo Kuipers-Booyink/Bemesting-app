@@ -34,7 +34,7 @@ except Exception as e:
 
 # Registraties inladen
 try:
-    df_registraties = conn.read(spreadsheet=SPREADSHEET_URL, worksheet="Formulierantwoorden 1", ttl=60)
+    df_registraties = conn.read(spreadsheet=SPREADSHEET_URL, worksheet="Formulierantwoorden 1", ttl=0)
 except Exception:
     df_registraties = pd.DataFrame()
 
