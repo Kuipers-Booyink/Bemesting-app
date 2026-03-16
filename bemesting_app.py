@@ -6,11 +6,12 @@ import requests
 import os
 
 # --- CONFIGURATIE ---
-SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1hesKBI8Vt1Agx_R6LSOdGabuXDaIDzf9yE2N7LGgtoo/edit#gid=0"
+# De URL is ingekort tot /edit om de "Bad Request" fout te voorkomen
+SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1hesKBI8Vt1Agx_R6LSOdGabuXDaIDzf9yE2N7LGgtoo/edit"
 TABBLAD_URL = "https://docs.google.com/spreadsheets/d/1hesKBI8Vt1Agx_R6LSOdGabuXDaIDzf9yE2N7LGgtoo/edit?gid=1833544521#gid=1833544521"
 FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSe-8l8ZiFqf011b7pGvQe2C2fmxkqENQRjhH3MSghD6tCXDwQ/formResponse"
 
-# NIEUWE MESTOPTIES
+# GEWIJZIGDE MESTOPTIES
 MEST_SOORTEN = ["Runderdrijfmest", "KAS", "Blending", "K-60"]
 
 # --- APP LAYOUT ---
@@ -24,17 +25,24 @@ st.title("Bemestingsregistratie Kuipers")
 # --- DATA OPHALEN ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# Percelen inladen (met ttl om verbinding vers te houden)
+# Percelen inladen uit tabblad "Percelen"
 try:
-    df_percelen = conn.read(spreadsheet=SPREADSHEET_URL, worksheet="Percelen", ttl=600)
-    percelen_data = df_percelen.set_index("Perceel").to_dict('index')
+    # ttl=10 zorgt voor een snelle verversing (elke 10 seconden) zonder de verbinding te blokkeren
+    df_percelen = conn.read(spreadsheet=SPREADSHEET_URL, worksheet="Percelen", ttl=10)
+    
+    if df_percelen.empty:
+        st.error("Het tabblad 'Percelen' is leeg.")
+        percelen_data = {}
+    else:
+        # We maken een zoeklijst op basis van de kolom 'Perceel'
+        percelen_data = df_percelen.set_index("Perceel").to_dict('index')
 except Exception as e:
     st.error(f"Kon de percelenlijst niet laden: {e}")
     percelen_data = {}
 
-# Registraties inladen
+# Bestaande registraties ophalen voor het overzicht
 try:
-    df_registraties = conn.read(spreadsheet=SPREADSHEET_URL, worksheet="Formulierantwoorden 1", ttl=0)
+    df_registraties = conn.read(spreadsheet=SPREADSHEET_URL, worksheet="Formulierantwoorden 1", ttl=10)
 except Exception:
     df_registraties = pd.DataFrame()
 
@@ -44,15 +52,15 @@ with st.form("bemesting_form", clear_on_submit=True):
     
     datum = st.date_input("Datum", date.today())
     
+    # Gebruik de lijst met percelen uit de spreadsheet
     geselecteerde_percelen = st.multiselect(
         "Selecteer Perce(e)l(en)", 
         options=list(percelen_data.keys()),
-        help="Hectares, Gewas en Grondsoort worden automatisch opgehaald uit de sheet."
+        help="Hectares, Gewas en Grondsoort worden automatisch uit de sheet gehaald."
     )
     
     col1, col2 = st.columns(2)
     with col1:
-        # Hier staan nu je nieuwe opties
         soort_mest = st.selectbox("Soort Mest", MEST_SOORTEN)
     with col2:
         hoeveelheid = st.number_input("Hoeveelheid (m3/kg per hectare)", min_value=0.0, step=1.0)
@@ -70,9 +78,10 @@ with st.form("bemesting_form", clear_on_submit=True):
         if not geselecteerde_percelen:
             st.error("Selecteer a.u.b. minimaal één perceel.")
         else:
-            geslaagd = 0
+            geslaagd_aantal = 0
             for p_naam in geselecteerde_percelen:
-                info = percelen_data[p_naam]
+                # Data per geselecteerd perceel opzoeken
+                info = percelen_data.get(p_naam, {})
                 p_ha = info.get("Hectares", 0)
                 p_gewas = info.get("Gewas", "Onbekend")
                 
@@ -92,14 +101,14 @@ with st.form("bemesting_form", clear_on_submit=True):
                 try:
                     response = requests.post(FORM_URL, data=form_data, timeout=10)
                     if response.status_code == 200:
-                        geslaagd += 1
+                        geslaagd_aantal += 1
                 except Exception as e:
                     st.error(f"Fout bij {p_naam}: {e}")
 
-            if geslaagd > 0:
-                st.success(f"✅ Opgeslagen voor {geslaagd} perce(e)l(en)!")
+            if geslaagd_aantal > 0:
+                st.success(f"✅ Succesvol opgeslagen voor {geslaagd_aantal} perce(e)l(en)!")
                 st.balloons()
-                st.cache_data.clear()
+                st.cache_data.clear() # Forceert verversing van het overzicht
 
 # --- OVERZICHT MET FILTERS ---
 st.divider()
@@ -108,30 +117,7 @@ st.subheader("🔍 Overzicht & Filters")
 if not df_registraties.empty:
     view_df = df_registraties.copy()
 
+    # Datum sortering (nieuwste boven)
     if 'Datum' in view_df.columns:
         view_df['Datum'] = pd.to_datetime(view_df['Datum']).dt.date
-        view_df = view_df.sort_values(by="Datum", ascending=False)
-
-    f1, f2 = st.columns(2)
-    with f1:
-        perceel_filter = st.multiselect("Filter op Perceel", options=sorted(view_df['Perceel'].unique().tolist()))
-    with f2:
-        mest_filter = st.multiselect("Filter op Mestsoort", options=sorted(view_df['Soort Mest'].unique().tolist()))
-
-    if perceel_filter:
-        view_df = view_df[view_df['Perceel'].isin(perceel_filter)]
-    if mest_filter:
-        view_df = view_df[view_df['Soort Mest'].isin(mest_filter)]
-
-    if 'Hectares' in view_df.columns and 'Hoeveelheid (m3/kg per hectare)' in view_df.columns:
-        ha = pd.to_numeric(view_df['Hectares'].astype(str).str.replace(',', '.'), errors='coerce')
-        hoeveel = pd.to_numeric(view_df['Hoeveelheid (m3/kg per hectare)'].astype(str).str.replace(',', '.'), errors='coerce')
-        view_df['Totaal m3/kg'] = (ha * hoeveel).round(2)
-
-    st.dataframe(view_df, use_container_width=True, hide_index=True)
-
-    if not view_df.empty and 'Totaal m3/kg' in view_df.columns:
-        totaal = view_df['Totaal m3/kg'].sum()
-        st.info(f"**Totaal in deze selectie:** {totaal:,.2f} m3 of kg")
-else:
-    st.info("Nog geen gegevens gevonden.")
+        view_df = view_df.
