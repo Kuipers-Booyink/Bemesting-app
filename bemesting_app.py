@@ -6,7 +6,7 @@ import requests
 import os
 
 # --- CONFIGURATIE ---
-# De schone URL zonder gid-codes
+# Gebruik de schone URL zonder extra gid-codes aan het eind
 SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1hesKBI8Vt1Agx_R6LSOdGabuXDaIDzf9yE2N7LGgtoo/edit"
 FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSe-8l8ZiFqf011b7pGvQe2C2fmxkqENQRjhH3MSghD6tCXDwQ/formResponse"
 
@@ -23,11 +23,11 @@ st.title("Bemestingsregistratie Kuipers")
 # --- DATA OPHALEN ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# 1. Percelen inladen
+# 1. Percelen inladen (Tabblad: Percelen)
 try:
     df_percelen = conn.read(spreadsheet=SPREADSHEET_URL, worksheet="Percelen", ttl=10)
     if not df_percelen.empty:
-        # We gebruiken 'Perceel' als index om hectares en gewas op te zoeken
+        # Zorg dat de kolom 'Perceel' de index wordt voor het opzoeken van data
         percelen_data = df_percelen.set_index("Perceel").to_dict('index')
     else:
         percelen_data = {}
@@ -35,12 +35,12 @@ except Exception as e:
     st.error(f"Fout bij laden percelen: {e}")
     percelen_data = {}
 
-# 2. Registraties inladen (Nu met de nieuwe tabbladnaam!)
+# 2. Registraties inladen (Tabblad: Registraties)
 try:
-    df_registraties = conn.read(spreadsheet=SPREADSHEET_URL, worksheet="Formulierantwoorden 1", ttl=10)
+    df_registraties = conn.read(spreadsheet=SPREADSHEET_URL, worksheet="Registraties", ttl=10)
 except Exception as e:
     df_registraties = pd.DataFrame()
-    st.warning(f"Kon tabel niet laden: {e}")
+    st.warning("Nog geen registraties gevonden of tabblad 'Registraties' is nog leeg.")
 
 # --- FORMULIER ---
 with st.form("bemesting_form", clear_on_submit=True):
@@ -48,9 +48,11 @@ with st.form("bemesting_form", clear_on_submit=True):
     
     datum = st.date_input("Datum", date.today())
     
+    # Gebruik de lijst met percelen uit de sheet
     geselecteerde_percelen = st.multiselect(
         "Selecteer Perce(e)l(en)", 
-        options=list(percelen_data.keys())
+        options=list(percelen_data.keys()),
+        help="Hectares en gewas worden automatisch opgehaald."
     )
     
     col1, col2 = st.columns(2)
@@ -72,10 +74,11 @@ with st.form("bemesting_form", clear_on_submit=True):
         if not geselecteerde_percelen:
             st.error("Selecteer a.u.b. minimaal één perceel.")
         else:
-            geslaagd = 0
+            geslaagd_aantal = 0
             for p_naam in geselecteerde_percelen:
                 info = percelen_data.get(p_naam, {})
-                p_ha = info.get("Hectares", 0) # Check of dit in je sheet 'Hectares' of 'Grootte (ha)' is
+                # Let op: de code zoekt hier naar de kolomnaam 'Hectares' in je Percelen-sheet
+                p_ha = info.get("Hectares", 0) 
                 p_gewas = info.get("Gewas", "Onbekend")
                 
                 form_data = {
@@ -90,37 +93,8 @@ with st.form("bemesting_form", clear_on_submit=True):
                     "entry.950345662": str(k_gehalte).replace('.', ','),
                     "entry.825026035": str(s_gehalte).replace('.', ',')
                 }
+
                 try:
-                    r = requests.post(FORM_URL, data=form_data, timeout=10)
-                    if r.status_code == 200: geslaagd += 1
-                except: pass
-
-            if geslaagd > 0:
-                st.success(f"✅ Opgeslagen voor {geslaagd} perce(e)l(en)!")
-                st.cache_data.clear()
-
-# --- OVERZICHT MET FILTERS ---
-st.divider()
-st.subheader("🔍 Overzicht & Filters")
-
-if not df_registraties.empty:
-    view_df = df_registraties.copy()
-
-    # Filters (ik gebruik 'Perceel' en 'Mest' omdat die in je sheet staan)
-    f1, f2 = st.columns(2)
-    with f1:
-        p_list = sorted(view_df['Perceel'].unique().tolist()) if 'Perceel' in view_df.columns else []
-        perceel_filter = st.multiselect("Filter op Perceel", options=p_list)
-    with f2:
-        m_col = 'Mest' if 'Mest' in view_df.columns else 'Soort Mest'
-        m_list = sorted(view_df[m_col].unique().tolist()) if m_col in view_df.columns else []
-        mest_filter = st.multiselect("Filter op Mestsoort", options=m_list)
-
-    if perceel_filter:
-        view_df = view_df[view_df['Perceel'].isin(perceel_filter)]
-    if mest_filter:
-        view_df = view_df[view_df[m_col].isin(mest_filter)]
-
-    st.dataframe(view_df, use_container_width=True, hide_index=True)
-else:
-    st.info("Nog geen registraties gevonden in 'Formulierantwoorden 1'.")
+                    response = requests.post(FORM_URL, data=form_data, timeout=10)
+                    if response.status_code == 200:
+                        geslaagd
