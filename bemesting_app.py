@@ -10,7 +10,7 @@ PERCELEN_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=o
 REGISTRATIES_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Registraties"
 FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSe-8l8ZiFqf011b7pGvQe2C2fmxkqENQRjhH3MSghD6tCXDwQ/formResponse"
 
-# De Entry ID's voor de totalen (nu per hectare)
+# De Entry ID's uit je link
 ENTRY_TOT_N = "entry.386036128"
 ENTRY_TOT_P = "entry.2075769698"
 ENTRY_TOT_K = "entry.1194216996"
@@ -67,7 +67,7 @@ col1, col2 = st.columns(2)
 with col1:
     soort_mest = st.selectbox("Soort Mest", MEST_SOORTEN)
 
-# --- STANDAARDWAARDEN ---
+# Standaardwaarden (KAS = 0.27 N, K-60 = 0.60 K2O)
 if soort_mest == "Runderdrijfmest":
     def_n, def_p, def_k, def_s = 4.5, 1.9, 5.5, 0.0
 elif soort_mest == "KAS":
@@ -95,8 +95,7 @@ with st.form("bemesting_form", clear_on_submit=True):
                 ha = safe_float(info["ha"])
                 hv = safe_float(hoeveelheid)
                 
-                # BEREKENING PER HECTARE: Hoeveelheid * Gehalte
-                # Voorbeeld: 200kg KAS * 0,27 N = 54kg N/ha
+                # BEREKENING PER HECTARE
                 t_n_ha = round(hv * safe_float(n_g), 2)
                 t_p_ha = round(hv * safe_float(p_g), 2)
                 t_k_ha = round(hv * safe_float(k_g), 2)
@@ -113,28 +112,8 @@ with st.form("bemesting_form", clear_on_submit=True):
                     "entry.239014507": str(p_g).replace('.', ','),
                     "entry.950345662": str(k_g).replace('.', ','),
                     "entry.825026035": str(s_g).replace('.', ','),
-                    # De totalen per hectare
+                    # De totalen per hectare naar de nieuwe velden
                     ENTRY_TOT_N: str(t_n_ha).replace('.', ','),
                     ENTRY_TOT_P: str(t_p_ha).replace('.', ','),
                     ENTRY_TOT_K: str(t_k_ha).replace('.', ','),
-                    ENTRY_TOT_S: str(t_s_ha).replace('.', ',')
-                }
-                requests.post(FORM_URL, data=form_data)
-            
-            st.success("✅ Opgeslagen! Totalen per hectare zijn berekend.")
-            st.cache_data.clear()
-            st.rerun()
-        else:
-            st.error("Selecteer a.u.b. minimaal één perceel.")
-
-# --- LOGBOEK ---
-st.divider()
-st.subheader("📋 Logboek")
-if not df_r_raw.empty:
-    view_df = df_r_raw.copy()
-    if 'Datum' in view_df.columns:
-        view_df['Datum'] = pd.to_datetime(view_df['Datum'], errors='coerce').dt.date
-    if 'Perceel' in view_df.columns and perceel_volgorde:
-        view_df['Perceel'] = pd.Categorical(view_df['Perceel'], categories=perceel_volgorde, ordered=True)
-        view_df = view_df.sort_values(['Perceel', 'Datum'], ascending=[True, False])
-    st.dataframe(view_df, use_container_width=True, hide_index=True)
+                    ENTRY_TOT_S
