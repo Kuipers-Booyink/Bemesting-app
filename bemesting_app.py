@@ -26,8 +26,8 @@ def load_percelen_data():
     try:
         df = pd.read_csv(PERCELEN_URL)
         if "Perceel" in df.columns:
-            # We bewaren de lijst 'perceel_volgorde' exact zoals ze in de sheet staan
-            perceel_volgorde = df["Perceel"].tolist()
+            # We halen de volgorde uit kolom A van de sheet Percelen
+            perceel_volgorde = df["Perceel"].dropna().unique().tolist()
             percelen_dict = df.set_index("Perceel").to_dict('index')
             return percelen_dict, perceel_volgorde
         return {}, []
@@ -50,7 +50,7 @@ with st.form("bemesting_form", clear_on_submit=True):
     
     datum = st.date_input("Datum", date.today())
     
-    # De multiselect gebruikt nu 'perceel_volgorde' (Kolom A van je sheet)
+    # Gebruik de volgorde uit de sheet voor de selectielijst
     geselecteerde_percelen = st.multiselect(
         "Selecteer Perce(e)l(en)", 
         options=perceel_volgorde,
@@ -92,7 +92,6 @@ with st.form("bemesting_form", clear_on_submit=True):
                     "entry.765229431": str(n_gehalte).replace('.', ','), 
                     "entry.239014507": str(p_gehalte).replace('.', ','),
                     "entry.950345662": str(k_gehalte).replace('.', ','),
-                    "entry.239014507": str(p_gehalte).replace('.', ','), # Dubbelcheck entry ID's indien nodig
                     "entry.825026035": str(s_gehalte).replace('.', ',')
                 }
 
@@ -114,15 +113,23 @@ st.subheader("🔍 Overzicht")
 if not df_registraties.empty:
     view_df = df_registraties.copy()
     
+    # 1. Datum converteren
     if 'Datum' in view_df.columns:
         view_df['Datum'] = pd.to_datetime(view_df['Datum'], errors='coerce').dt.date
 
-    # SORTEREN op basis van de volgorde in de Percelen-lijst
+    # 2. SORTEREN op basis van de volgorde in de Percelen-lijst (Kolom A)
     if 'Perceel' in view_df.columns and perceel_volgorde:
-        # Maak een tijdelijke kolom aan om op de specifieke lijst-index te sorteren
-        view_df['Perceel'] = pd.Categorical(view_df['Perceel'], categories=perceel_volgorde, ordered=True)
+        # We dwingen de kolom 'Perceel' om de volgorde van perceel_volgorde aan te nemen
+        view_df['Perceel'] = pd.Categorical(
+            view_df['Perceel'], 
+            categories=perceel_volgorde, 
+            ordered=True
+        )
+        
+        # Sorteer eerst op Perceel (volgens lijst) en dan op Datum (nieuwste boven)
         view_df = view_df.sort_values(by=['Perceel', 'Datum'], ascending=[True, False])
 
+    # De tabel tonen
     st.dataframe(view_df, use_container_width=True, hide_index=True)
 else:
     st.info("Geen eerdere registraties gevonden.")
