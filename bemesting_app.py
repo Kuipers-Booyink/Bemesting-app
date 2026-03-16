@@ -1,5 +1,5 @@
 import streamlit as st
-import pd
+import pandas as pd
 from datetime import date
 import requests
 import os
@@ -67,7 +67,7 @@ col1, col2 = st.columns(2)
 with col1:
     soort_mest = st.selectbox("Soort Mest", MEST_SOORTEN)
 
-# --- STANDAARDWAARDEN (GECORRIGEERD) ---
+# --- STANDAARDWAARDEN ---
 if soort_mest == "Runderdrijfmest":
     def_n, def_p, def_k, def_s = 4.5, 1.9, 5.5, 0.0
 elif soort_mest == "KAS":
@@ -95,7 +95,7 @@ with st.form("bemesting_form", clear_on_submit=True):
                 ha = safe_float(info["ha"])
                 hv = safe_float(hoeveelheid)
                 
-                # BEREKENING PER HECTARE: Hoeveelheid * Gehalte
+                # BEREKENING PER HECTARE
                 t_n_ha = round(hv * safe_float(n_g), 2)
                 t_p_ha = round(hv * safe_float(p_g), 2)
                 t_k_ha = round(hv * safe_float(k_g), 2)
@@ -119,7 +119,7 @@ with st.form("bemesting_form", clear_on_submit=True):
                 }
                 requests.post(FORM_URL, data=form_data)
             
-            st.success("✅ Opgeslagen! Waarden per hectare berekend.")
+            st.success("✅ Opgeslagen! De waarden per hectare zijn berekend.")
             st.cache_data.clear()
             st.rerun()
         else:
