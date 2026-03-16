@@ -99,7 +99,7 @@ with st.form("bemesting_form", clear_on_submit=True):
                     st.error(f"Fout bij {p_naam}: {e}")
 
             if geslaagd_aantal > 0:
-                st.success(f"✅ Opgeslagen voor {geslaagd_aantal} perce(e)l(en)!")
+                st.success(f"✅ Succesvol opgeslagen voor {geslaagd_aantal} perce(e)l(en)!")
                 st.balloons()
                 st.cache_data.clear()
 
@@ -120,4 +120,23 @@ if not df_registraties.empty:
     with f1:
         perceel_filter = st.multiselect("Filter op Perceel", options=sorted(view_df['Perceel'].unique().tolist()))
     with f2:
-        mest_filter = st.multiselect("Filter op Mestsoort", options=sorted(view_df
+        mest_filter = st.multiselect("Filter op Mestsoort", options=sorted(view_df['Soort Mest'].unique().tolist()))
+
+    if perceel_filter:
+        view_df = view_df[view_df['Perceel'].isin(perceel_filter)]
+    if mest_filter:
+        view_df = view_df[view_df['Soort Mest'].isin(mest_filter)]
+
+    # Berekening
+    if 'Hectares' in view_df.columns and 'Hoeveelheid (m3/kg per hectare)' in view_df.columns:
+        ha_val = pd.to_numeric(view_df['Hectares'].astype(str).str.replace(',', '.'), errors='coerce')
+        gift_val = pd.to_numeric(view_df['Hoeveelheid (m3/kg per hectare)'].astype(str).str.replace(',', '.'), errors='coerce')
+        view_df['Totaal m3/kg'] = (ha_val * gift_val).round(2)
+
+    st.dataframe(view_df, use_container_width=True, hide_index=True)
+
+    if not view_df.empty and 'Totaal m3/kg' in view_df.columns:
+        totaal_som = view_df['Totaal m3/kg'].sum()
+        st.info(f"**Totaal in deze selectie:** {totaal_som:,.2f} m3 of kg")
+else:
+    st.info("Nog geen registraties gevonden.")
