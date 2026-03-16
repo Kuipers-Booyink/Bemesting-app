@@ -6,12 +6,10 @@ import requests
 import os
 
 # --- CONFIGURATIE ---
-# De URL is ingekort tot /edit om de "Bad Request" fout te voorkomen
 SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1hesKBI8Vt1Agx_R6LSOdGabuXDaIDzf9yE2N7LGgtoo/edit"
 TABBLAD_URL = "https://docs.google.com/spreadsheets/d/1hesKBI8Vt1Agx_R6LSOdGabuXDaIDzf9yE2N7LGgtoo/edit?gid=1833544521#gid=1833544521"
 FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSe-8l8ZiFqf011b7pGvQe2C2fmxkqENQRjhH3MSghD6tCXDwQ/formResponse"
 
-# GEWIJZIGDE MESTOPTIES
 MEST_SOORTEN = ["Runderdrijfmest", "KAS", "Blending", "K-60"]
 
 # --- APP LAYOUT ---
@@ -25,22 +23,19 @@ st.title("Bemestingsregistratie Kuipers")
 # --- DATA OPHALEN ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# Percelen inladen uit tabblad "Percelen"
+# Percelen inladen
 try:
-    # ttl=10 zorgt voor een snelle verversing (elke 10 seconden) zonder de verbinding te blokkeren
     df_percelen = conn.read(spreadsheet=SPREADSHEET_URL, worksheet="Percelen", ttl=10)
-    
     if df_percelen.empty:
         st.error("Het tabblad 'Percelen' is leeg.")
         percelen_data = {}
     else:
-        # We maken een zoeklijst op basis van de kolom 'Perceel'
         percelen_data = df_percelen.set_index("Perceel").to_dict('index')
 except Exception as e:
     st.error(f"Kon de percelenlijst niet laden: {e}")
     percelen_data = {}
 
-# Bestaande registraties ophalen voor het overzicht
+# Registraties ophalen
 try:
     df_registraties = conn.read(spreadsheet=SPREADSHEET_URL, worksheet="Formulierantwoorden 1", ttl=10)
 except Exception:
@@ -52,11 +47,10 @@ with st.form("bemesting_form", clear_on_submit=True):
     
     datum = st.date_input("Datum", date.today())
     
-    # Gebruik de lijst met percelen uit de spreadsheet
     geselecteerde_percelen = st.multiselect(
         "Selecteer Perce(e)l(en)", 
         options=list(percelen_data.keys()),
-        help="Hectares, Gewas en Grondsoort worden automatisch uit de sheet gehaald."
+        help="Gegevens worden automatisch uit de sheet gehaald."
     )
     
     col1, col2 = st.columns(2)
@@ -80,7 +74,6 @@ with st.form("bemesting_form", clear_on_submit=True):
         else:
             geslaagd_aantal = 0
             for p_naam in geselecteerde_percelen:
-                # Data per geselecteerd perceel opzoeken
                 info = percelen_data.get(p_naam, {})
                 p_ha = info.get("Hectares", 0)
                 p_gewas = info.get("Gewas", "Onbekend")
@@ -106,18 +99,25 @@ with st.form("bemesting_form", clear_on_submit=True):
                     st.error(f"Fout bij {p_naam}: {e}")
 
             if geslaagd_aantal > 0:
-                st.success(f"✅ Succesvol opgeslagen voor {geslaagd_aantal} perce(e)l(en)!")
+                st.success(f"✅ Opgeslagen voor {geslaagd_aantal} perce(e)l(en)!")
                 st.balloons()
-                st.cache_data.clear() # Forceert verversing van het overzicht
+                st.cache_data.clear()
 
-# --- OVERZICHT MET FILTERS ---
+# --- OVERZICHT ---
 st.divider()
 st.subheader("🔍 Overzicht & Filters")
 
 if not df_registraties.empty:
     view_df = df_registraties.copy()
 
-    # Datum sortering (nieuwste boven)
+    # Datum sortering
     if 'Datum' in view_df.columns:
         view_df['Datum'] = pd.to_datetime(view_df['Datum']).dt.date
-        view_df = view_df.
+        view_df = view_df.sort_values(by="Datum", ascending=False)
+
+    # Filters
+    f1, f2 = st.columns(2)
+    with f1:
+        perceel_filter = st.multiselect("Filter op Perceel", options=sorted(view_df['Perceel'].unique().tolist()))
+    with f2:
+        mest_filter = st.multiselect("Filter op Mestsoort", options=sorted(view_df
