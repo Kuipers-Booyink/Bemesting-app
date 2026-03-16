@@ -67,6 +67,8 @@ col1, col2 = st.columns(2)
 with col1:
     soort_mest = st.selectbox("Soort Mest", MEST_SOORTEN)
 
-# Standaardwaarden (KAS = 0.27 N, K-60 = 0.60 K2O)
+# --- STANDAARDWAARDEN (Hier zat de fout) ---
 if soort_mest == "Runderdrijfmest":
-    def_n, def_p, def_k, def_s = 4.5, 1.9, 5.5
+    def_n, def_p, def_k, def_s = 4.5, 1.9, 5.5, 0.0
+elif soort_mest == "KAS":
+    def_n, def_p,
