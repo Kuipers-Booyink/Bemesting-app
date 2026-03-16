@@ -68,7 +68,7 @@ with col1:
 
 # Logica voor automatische waardes
 if soort_mest == "KAS":
-    default_n = 27.0
+    default_n = 0.27
     default_p = 0.0
     default_k = 0.0
     default_s = 0.0
