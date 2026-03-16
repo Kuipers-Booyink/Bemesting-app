@@ -69,7 +69,7 @@ if soort_mest == "Runderdrijfmest":
 elif soort_mest == "KAS":
     default_n, default_p, default_k, default_s = 27.0, 0.0, 0.0, 0.0
 elif soort_mest == "K-60":
-    default_n, default_p, default_k, default_s = 0.0, 0.0, 60.0, 0.0
+    default_n, default_p, default_k, default_s = 0.0, 0.0, 0.6, 0.0
 else: # Blending of andere
     default_n, default_p, default_k, default_s = 0.0, 0.0, 0.0, 0.0
 
