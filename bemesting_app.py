@@ -67,7 +67,7 @@ with col1:
 if soort_mest == "Runderdrijfmest":
     default_n, default_p, default_k, default_s = 4.5, 1.9, 5.5, 0.0
 elif soort_mest == "KAS":
-    default_n, default_p, default_k, default_s = 27.0, 0.0, 0.0, 0.0
+    default_n, default_p, default_k, default_s = 0.27, 0.0, 0.0, 0.0
 elif soort_mest == "K-60":
     default_n, default_p, default_k, default_s = 0.0, 0.0, 0.6, 0.0
 else: # Blending of andere
