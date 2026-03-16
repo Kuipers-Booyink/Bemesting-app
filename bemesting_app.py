@@ -22,26 +22,26 @@ st.title("Bemestingsregistratie Kuipers")
 
 # --- DATA OPHALEN ---
 @st.cache_data(ttl=10)
-def load_percelen():
+def load_percelen_data():
     try:
         df = pd.read_csv(PERCELEN_URL)
         if "Perceel" in df.columns:
-            # Sorteren op naam voor het dropdown-menu
-            df = df.sort_values(by="Perceel")
-            return df.set_index("Perceel").to_dict('index')
-        return {}
+            # We bewaren de lijst 'perceel_volgorde' exact zoals ze in de sheet staan
+            perceel_volgorde = df["Perceel"].tolist()
+            percelen_dict = df.set_index("Perceel").to_dict('index')
+            return percelen_dict, perceel_volgorde
+        return {}, []
     except:
-        return {}
+        return {}, []
 
 @st.cache_data(ttl=10)
 def load_registraties():
     try:
-        df = pd.read_csv(REGISTRATIES_URL)
-        return df
+        return pd.read_csv(REGISTRATIES_URL)
     except:
         return pd.DataFrame()
 
-percelen_data = load_percelen()
+percelen_data, perceel_volgorde = load_percelen_data()
 df_registraties = load_registraties()
 
 # --- FORMULIER ---
@@ -50,13 +50,11 @@ with st.form("bemesting_form", clear_on_submit=True):
     
     datum = st.date_input("Datum", date.today())
     
-    # Opties staan nu op alfabetische volgorde
-    perceel_opties = sorted(list(percelen_data.keys()))
-    
+    # De multiselect gebruikt nu 'perceel_volgorde' (Kolom A van je sheet)
     geselecteerde_percelen = st.multiselect(
         "Selecteer Perce(e)l(en)", 
-        options=perceel_opties,
-        help="Hectares en gewas worden automatisch opgehaald."
+        options=perceel_volgorde,
+        help="De volgorde uit de sheet 'Percelen' wordt aangehouden."
     )
     
     col1, col2 = st.columns(2)
@@ -94,6 +92,7 @@ with st.form("bemesting_form", clear_on_submit=True):
                     "entry.765229431": str(n_gehalte).replace('.', ','), 
                     "entry.239014507": str(p_gehalte).replace('.', ','),
                     "entry.950345662": str(k_gehalte).replace('.', ','),
+                    "entry.239014507": str(p_gehalte).replace('.', ','), # Dubbelcheck entry ID's indien nodig
                     "entry.825026035": str(s_gehalte).replace('.', ',')
                 }
 
@@ -110,36 +109,19 @@ with st.form("bemesting_form", clear_on_submit=True):
 
 # --- OVERZICHT ---
 st.divider()
-st.subheader("🔍 Overzicht (Gesoorteerd op Perceel)")
+st.subheader("🔍 Overzicht")
 
 if not df_registraties.empty:
     view_df = df_registraties.copy()
     
-    # Datum omzetten voor sortering
     if 'Datum' in view_df.columns:
         view_df['Datum'] = pd.to_datetime(view_df['Datum'], errors='coerce').dt.date
 
-    # SORTEREN: Eerst op Perceel (A-Z), dan op Datum (Nieuwste eerst)
-    sort_cols = []
-    sort_orders = []
-    
-    if 'Perceel' in view_df.columns:
-        sort_cols.append('Perceel')
-        sort_orders.append(True) # True = A-Z
-    
-    if 'Datum' in view_df.columns:
-        sort_cols.append('Datum')
-        sort_orders.append(False) # False = Nieuwste boven
-
-    if sort_cols:
-        view_df = view_df.sort_values(by=sort_cols, ascending=sort_orders)
-
-    # Filter optie blijft bestaan
-    if 'Perceel' in view_df.columns:
-        p_opties = sorted(view_df['Perceel'].unique().tolist())
-        p_filter = st.multiselect("Filter op Perceel", options=p_opties)
-        if p_filter:
-            view_df = view_df[view_df['Perceel'].isin(p_filter)]
+    # SORTEREN op basis van de volgorde in de Percelen-lijst
+    if 'Perceel' in view_df.columns and perceel_volgorde:
+        # Maak een tijdelijke kolom aan om op de specifieke lijst-index te sorteren
+        view_df['Perceel'] = pd.Categorical(view_df['Perceel'], categories=perceel_volgorde, ordered=True)
+        view_df = view_df.sort_values(by=['Perceel', 'Datum'], ascending=[True, False])
 
     st.dataframe(view_df, use_container_width=True, hide_index=True)
 else:
